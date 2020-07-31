@@ -1,24 +1,17 @@
+var CACHE_STATIC_NAME = "static-v4";
+var CACHE_DYNAMIC_NAME = "dynamic-v2";
+
 self.addEventListener("install", function(event) {
   console.log("[Service Worker] Installing Service Worker ...", event);
-  /**
-   * The install events in service workers use waitUntil() to hold the service
-   * worker in the installing phase until tasks complete. If the promise passed
-   * to waitUntil() rejects, the install is considered a failure, and the
-   * installing service worker is discarded. This is primarily used to ensure
-   * that a service worker is not considered installed until all of the core
-   * caches it depends on are successfully populated.
-   */
   event.waitUntil(
-    caches.open("static-v2").then(cache => {
-      console.log("service worker precaching App Shell");
-      // although the file path is used, the 'key' will be the request and
-      // 'value' will be the file content; see how we use .match() below
+    caches.open(CACHE_STATIC_NAME).then(function(cache) {
+      console.log("[Service Worker] Precaching App Shell");
       cache.addAll([
-        "/", // cache root request
+        "/",
         "/index.html",
         "/src/js/app.js",
         "/src/js/feed.js",
-        "/src/js/promise.js", // a better way is to conditionally 'include' polyfill files, since modern browsers who support service worker should also support promise/fetch and do not need these files
+        "/src/js/promise.js",
         "/src/js/fetch.js",
         "/src/js/material.min.js",
         "/src/css/app.css",
@@ -35,35 +28,35 @@ self.addEventListener("install", function(event) {
 self.addEventListener("activate", function(event) {
   console.log("[Service Worker] Activating Service Worker ....", event);
   event.waitUntil(
-    caches.keys().then(keyList =>
-      Promise.all(
-        keyList.map(k => {
-          if (k !== "static-v2" && k !== "dynamic") {
-            console.log("[service worker] removing old cache", k);
-            return caches.delete(k);
+    caches.keys().then(function(keyList) {
+      return Promise.all(
+        keyList.map(function(key) {
+          if (key !== CACHE_STATIC_NAME && key !== CACHE_DYNAMIC_NAME) {
+            console.log("[Service Worker] Removing old cache.", key);
+            return caches.delete(key);
           }
         })
-      )
-    )
+      );
+    })
   );
   return self.clients.claim();
 });
 
 self.addEventListener("fetch", function(event) {
   event.respondWith(
-    caches.match(event.request).then(response => {
-      if (response) return response; // cache hit, otherwise it's null
-      return fetch(event.request).then(res => {
-        caches.open("dynamic").then(cache => cache.put(event.request.url, res));
-        return res.clone();
-      });
-      /* 注意两种写法的不同。上边的缓存过程将会在另一个promise中异步执行；这里是要等缓存好了才return res
-      return fetch(event.request).then(res =>
-        caches.open("dynamic").then(cache => {
-          cache.put(event.request.url, res);
-          return res.clone();
-        })
-      );*/
+    caches.match(event.request).then(function(response) {
+      if (response) {
+        return response;
+      } else {
+        return fetch(event.request)
+          .then(function(res) {
+            return caches.open(CACHE_DYNAMIC_NAME).then(function(cache) {
+              cache.put(event.request.url, res.clone());
+              return res;
+            });
+          })
+          .catch(function(err) {});
+      }
     })
   );
 });
