@@ -41,7 +41,17 @@ self.addEventListener("fetch", function(event) {
   event.respondWith(
     caches.match(event.request).then(response => {
       if (response) return response; // cache hit, otherwise it's null
-      return fetch(event.request);
+      return fetch(event.request).then(res => {
+        caches.open("dynamic").then(cache => cache.put(event.request.url, res));
+        return res.clone();
+      });
+      /* 注意两种写法的不同。上边的缓存过程将会在另一个promise中异步执行；这里是要等缓存好了才return res
+      return fetch(event.request).then(res =>
+        caches.open("dynamic").then(cache => {
+          cache.put(event.request.url, res);
+          return res.clone();
+        })
+      );*/
     })
   );
 });
