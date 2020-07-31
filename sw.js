@@ -9,7 +9,7 @@ self.addEventListener("install", function(event) {
    * caches it depends on are successfully populated.
    */
   event.waitUntil(
-    caches.open("static").then(cache => {
+    caches.open("static-v2").then(cache => {
       console.log("service worker precaching App Shell");
       // although the file path is used, the 'key' will be the request and
       // 'value' will be the file content; see how we use .match() below
@@ -34,6 +34,18 @@ self.addEventListener("install", function(event) {
 
 self.addEventListener("activate", function(event) {
   console.log("[Service Worker] Activating Service Worker ....", event);
+  event.waitUntil(
+    caches.keys().then(keyList =>
+      Promise.all(
+        keyList.map(k => {
+          if (k !== "static-v2" && k !== "dynamic") {
+            console.log("[service worker] removing old cache", k);
+            return caches.delete(k);
+          }
+        })
+      )
+    )
+  );
   return self.clients.claim();
 });
 
